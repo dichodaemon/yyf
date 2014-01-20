@@ -165,6 +165,7 @@ bool Driver::inverseYaw()
 void Driver::drive(tSituation *s)
 {
 
+	/*
 	// change the expected speed every TIME_FOR_VEL_CHANGE frames
 	if (vel_keep_time++ >= TIME_FOR_VEL_CHANGE)
 	{
@@ -172,6 +173,7 @@ void Driver::drive(tSituation *s)
 		MaxSpeed = rand()%30+100.0;
 		//printf("index %d: %.2f\t", INDEX, MaxSpeed);
 	}
+	*/
 
 	update(s);
 	memset(&car->ctrl, 0, sizeof(tCarCtrl));
