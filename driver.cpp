@@ -34,7 +34,7 @@ const float Driver::ABS_SLIP = 0.9;							/* [-] range [0.95..0.3] */
 const float Driver::ABS_MINSPEED = 3.0;						/* [m/s] */
 const float Driver::TCL_SLIP = 0.9;							/* [-] range [0.95..0.3] */
 const float Driver::TCL_MINSPEED = 3.0;						/* [m/s] */
-const float Driver::LOOKAHEAD_CONST = 10.0;					/* [m] */
+const float Driver::LOOKAHEAD_CONST = 5.0;					/* [m] */
 const float Driver::LOOKAHEAD_FACTOR = 0.33;				/* [-] */
 const float Driver::WIDTHDIV = 3.0;							/* [-] */
 const float Driver::SIDECOLL_MARGIN = 2.0;					/* [m] */
@@ -199,8 +199,9 @@ void Driver::drive(tSituation *s)
 		
 		if (InitialPose>=0 && !PoseInitialized && fabs( InitialPose - car->_distFromStartLine)<20 )
 		{
+			car->ctrl.gear = 0;
 			car->ctrl.brakeCmd =1.0; // brake when reaching the InitialPose
-			if (fabs(opponent[LeadingCar].getSpeed()) > 1.0)
+			if (fabs(opponent[LeadingCar].getSpeed()) > 5.0)
 				PoseInitialized = true;
 		}
 		else
