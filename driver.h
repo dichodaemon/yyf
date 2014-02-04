@@ -139,6 +139,20 @@ class Driver {
 		static const int MAX_COUNT_FOR_CHANGE;
 		static const int INDEX_FOR_CHANGE;
 		int countForChange;
+		// yyf Test for velocity
+		static const int INDEX_FOR_VELOCITY;
+		static const float ACCEL_START_POINT;
+		static const float ACCEL_STOP_POINT;
+		static const float BRAKE_START_POINT;
+		static const float BRAKE_STOP_POINT;
+		static const int MAX_STEPS_FOR_VELOCITY;
+		static const float MAX_SPEED_FOR_TEST;
+		int step;
+		bool brakeBeforeAccel;		
+		bool accelStart;
+		bool brakeStart;
+		FILE* logFile;
+		void VelocityTest();
 
 
 		/* track variables */

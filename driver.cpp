@@ -44,9 +44,18 @@ const float Driver::MIN_DIST_FOR_SPEED_LIMIT = 80.0;		/* [m] */
 const int   Driver::TIME_FOR_VEL_CHANGE = 1000;
 const int 	Driver::ZIG_ZAG_TIME = 6;
 
-		// yyf Test for Kalman filter 20140204
+// yyf Test for Kalman filter 20140204
 const int Driver::MAX_COUNT_FOR_CHANGE = 200;
 const int Driver::INDEX_FOR_CHANGE = 0;
+
+// yyf Test for velocity
+const int Driver::INDEX_FOR_VELOCITY = 1;
+const int Driver::MAX_STEPS_FOR_VELOCITY = 10;
+const float Driver::ACCEL_START_POINT = 715;
+const float Driver::ACCEL_STOP_POINT = 900;
+const float Driver::BRAKE_START_POINT = 1530;
+const float Driver::BRAKE_STOP_POINT = 95;
+const float Driver::MAX_SPEED_FOR_TEST = 33.4;
 
 
 /*
@@ -110,6 +119,11 @@ void Driver::newRace(tCarElt* car, tSituation *s)
 
 	//yyf Test for Kalman filter 20140204
 	countForChange=0;
+	// yyf Test for velocity
+	brakeBeforeAccel = false;		
+	accelStart = false;
+	brakeStart = false;
+	step = 0;
 }
 
 
@@ -164,9 +178,7 @@ bool Driver::inverseYaw()
 				return true;
 		}
 	}
-
 	return false;
-
 }
 
 /* Drive during race. */
@@ -218,9 +230,10 @@ void Driver::drive(tSituation *s)
 		}
 	}
 	
-	//forDebug
-	//car->ctrl.accelCmd = 1.0;
-	//car->ctrl.brakeCmd = 0.0;
+	// yyf Test for velocity
+	if (INDEX==INDEX_FOR_VELOCITY)
+		VelocityTest();
+
 }
 
 
@@ -871,3 +884,79 @@ float Driver::filterTrk(float accel)
 	}
 }
 
+
+void Driver::VelocityTest()
+{
+	char FileDir[] = "/home/emotion/yuyu/INRIA_documents/Accel_Brake_Param/";
+	MaxSpeed = MAX_SPEED_FOR_TEST;
+	float EPS = 5.0;
+	float min_speed = 1.0;
+	float speed = sqrt(car->_speed_x*car->_speed_x + car->_speed_y*car->_speed_y);
+	char FileName[255];
+
+	if (accelStart)
+	{
+		car->ctrl.accelCmd = step*1.0/MAX_STEPS_FOR_VELOCITY;
+		car->ctrl.brakeCmd = 0.0;
+		fprintf(logFile, "%f\t%f\n", speed, car->ctrl.accelCmd);		
+		if ( speed >= MAX_SPEED_FOR_TEST || abs(car->_distFromStartLine - ACCEL_STOP_POINT) < EPS )
+		{
+			accelStart = false;
+			fclose(logFile);
+		}
+		return;
+	}else if (brakeStart)
+	{
+		car->ctrl.accelCmd = 0.0;
+		car->ctrl.brakeCmd = step*1.0/MAX_STEPS_FOR_VELOCITY;
+		fprintf(logFile, "%f\t%f\n", speed, -car->ctrl.brakeCmd);
+		if ( speed <= min_speed || abs(car->_distFromStartLine - BRAKE_STOP_POINT) < EPS )
+		{
+			brakeStart = false;
+			fclose(logFile);
+		}
+		return;
+	}else if (brakeBeforeAccel)
+	{
+		car->ctrl.accelCmd = 0.0;
+		car->ctrl.brakeCmd = 1.0;
+		if ( speed <= min_speed)
+		{
+			step++;
+			//step = 5;	//for test
+			step = (step-1)%MAX_STEPS_FOR_VELOCITY + 1;					
+			for (int i=1; i<=10000; i++)
+			{
+				sprintf(FileName,"%s%s_accel_%02d0(%02d).txt", FileDir, car->_carName, step, i);
+				if (logFile = fopen(FileName,"r"))
+				{
+					fclose(logFile);
+				}else
+					break;
+			}
+			logFile = fopen(FileName,"w");
+			brakeBeforeAccel = false;
+			accelStart = true;
+		}
+		return;
+	}else
+	{
+		if ( abs(car->_distFromStartLine - ACCEL_START_POINT) < EPS )
+		{
+			brakeBeforeAccel = true;
+		}else if ( abs(car->_distFromStartLine - BRAKE_START_POINT) < EPS )
+		{
+			for (int i=1; i<=10000; i++)
+			{
+				sprintf(FileName,"%s%s_brake_%02d0(%02d).txt",FileDir, car->_carName, step, i);
+				if (logFile = fopen(FileName,"r"))
+				{
+					fclose(logFile);
+				}else
+					break;
+			}
+			logFile = fopen(FileName,"w");
+			brakeStart = true;
+		}
+	}
+}
