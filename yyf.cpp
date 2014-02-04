@@ -50,6 +50,8 @@ static void shutdown(int index);
 static int  InitFuncPt(int index, void *pt); 
 
 
+FILE* fpDebug;
+
 /* 
  * Module entry point  
  */ 
@@ -100,6 +102,7 @@ static void initTrack(int index, tTrack* track, void *carHandle,
 /* Start a new race. */
 static void newRace(int index, tCarElt* car, tSituation *s)
 {
+//	fpDebug = fopen("tmpCarSpeed.txt","w");
     driver[index]->newRace(car, s);
 }
 
@@ -108,6 +111,7 @@ static void newRace(int index, tCarElt* car, tSituation *s)
 static void drive(int index, tCarElt* car, tSituation *s)
 {
     driver[index]->drive(s);
+//	fprintf(fpDebug,"%f, %d\n", car->_speed_x, car->_gear);
 }
 
 
@@ -122,11 +126,13 @@ static int pitcmd(int index, tCarElt* car, tSituation *s)
 static void endRace(int index, tCarElt *car, tSituation *s)
 {
     driver[index]->endRace(s);
+//	if (fpDebug)	fclose(fpDebug);
 }
 
 
 /* Called before the module is unloaded */
 static void shutdown(int index)
 {
+//	if (fpDebug)	fclose(fpDebug);
     delete driver[index];
 }

@@ -44,6 +44,11 @@ const float Driver::MIN_DIST_FOR_SPEED_LIMIT = 80.0;		/* [m] */
 const int   Driver::TIME_FOR_VEL_CHANGE = 1000;
 const int 	Driver::ZIG_ZAG_TIME = 6;
 
+		// yyf Test for Kalman filter 20140204
+const int Driver::MAX_COUNT_FOR_CHANGE = 200;
+const int Driver::INDEX_FOR_CHANGE = 0;
+
+
 /*
 Driver::Driver(int index)
 {
@@ -102,6 +107,9 @@ void Driver::newRace(tCarElt* car, tSituation *s)
 	/* initialize the list of opponents */
 	opponents = new Opponents(s, this);
 	opponent = opponents->getOpponentPtr();
+
+	//yyf Test for Kalman filter 20140204
+	countForChange=0;
 }
 
 
@@ -190,9 +198,6 @@ void Driver::drive(tSituation *s)
 		car->ctrl.accelCmd = 0.5; // 30% accelerator pedal
 		car->ctrl.brakeCmd = 0.0; // no brakes
 	} else {
-		//if (fabs(speed) < 0.1)
-		//	car->ctrl.steer = 0.0;
-		//else
 			car->ctrl.steer = filterSColl(getSteer());
 
 		car->ctrl.gear = getGear();
@@ -212,6 +217,10 @@ void Driver::drive(tSituation *s)
 			car->ctrl.accelCmd = 0.0;
 		}
 	}
+	
+	//forDebug
+	//car->ctrl.accelCmd = 1.0;
+	//car->ctrl.brakeCmd = 0.0;
 }
 
 
@@ -458,7 +467,7 @@ float Driver::getBrake()
 		else if (brakedist > lookaheaddist*1.5)
 			return 0.2;
 	}
-	
+
 	lookaheaddist = 0;
 	//segptr = segptr->next;
 	while (lookaheaddist < maxlookaheaddist) {
@@ -490,7 +499,8 @@ float Driver::getBrake()
 /* Compute gear */
 int Driver::getGear()
 {
-	if (car->_gear <= 0) return 1;
+	if (car->_gear <= 0)
+		return 1;
 	float gr_up = car->_gearRatio[car->_gear + car->_gearOffset];
 	float omega = car->_enginerpmRedLine/gr_up;
 	float wr = car->_wheelRadius(2);
@@ -520,7 +530,6 @@ float Driver::getSteer()
 	return targetAngle / car->_steerLock;
 }
 
-
 /* compute target point for steering */
 v2d Driver::getTargetPoint()
 {
@@ -549,6 +558,17 @@ v2d Driver::getTargetPoint()
 		}
 		length = length - lookahead;
 		offset = seg->width/4;
+	}
+
+	// yyf Test for Kalman filter
+	if (INDEX == INDEX_FOR_CHANGE)
+	{
+		countForChange++;
+		if ( (countForChange / MAX_COUNT_FOR_CHANGE) % 2 == 0)
+			offset = seg->width/4;
+		else
+			offset = -seg->width/4;
+		printf("%f\n",offset);
 	}
 
 	v2d s;

@@ -135,6 +135,11 @@ class Driver {
 		static const int   TIME_FOR_VEL_CHANGE;
 		static const int   ZIG_ZAG_TIME;
 		static const float MIN_DIST_BETWEEN_CARS;		
+		// yyf Test for Kalman filter 20140204
+		static const int MAX_COUNT_FOR_CHANGE;
+		static const int INDEX_FOR_CHANGE;
+		int countForChange;
+
 
 		/* track variables */
 		tTrack* track;
