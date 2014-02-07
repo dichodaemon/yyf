@@ -50,11 +50,15 @@ const int Driver::INDEX_FOR_CHANGE = 0;
 
 // yyf Test for velocity
 const int Driver::INDEX_FOR_VELOCITY = 1;
-const int Driver::MAX_STEPS_FOR_VELOCITY = 10;
+const int Driver::MAX_STEPS_FOR_ACCEL = 10;
+const int Driver::MAX_STEPS_FOR_BRAKE = 10;
+const int Driver::MAX_STEPS_FOR_BA = 3;
 const float Driver::ACCEL_START_POINT = 715;
-const float Driver::ACCEL_STOP_POINT = 900;
+const float Driver::ACCEL_STOP_POINT = 1300; //900
 const float Driver::BRAKE_START_POINT = 1530;
 const float Driver::BRAKE_STOP_POINT = 95;
+const float Driver::BRAKE_ACCEL_START_POINT = 715;
+const float Driver::BRAKE_ACCEL_STOP_POINT = 1300;
 const float Driver::MAX_SPEED_FOR_TEST = 33.4;
 
 
@@ -123,7 +127,11 @@ void Driver::newRace(tCarElt* car, tSituation *s)
 	brakeBeforeAccel = false;		
 	accelStart = false;
 	brakeStart = false;
-	step = 0;
+	brakeAccelStart = false;
+	accelStep = 0;
+	brakeStep = 0;
+	brakeAccelStep = 0;
+	roundTestVelocity = 0;
 }
 
 
@@ -581,7 +589,7 @@ v2d Driver::getTargetPoint()
 			offset = seg->width/4;
 		else
 			offset = -seg->width/4;
-		printf("%f\n",offset);
+		// printf("%f\n",offset);
 	}
 
 	v2d s;
@@ -884,56 +892,95 @@ float Driver::filterTrk(float accel)
 	}
 }
 
+// yyf Test for velocity
+// the clock is not correct
+float Driver::GetTimeFloat()
+{
+//	printf("%f %d\n", ((float)clock()) , CLOCKS_PER_SEC);
+	return ((float)clock()) / CLOCKS_PER_SEC;
+}
+
 
 void Driver::VelocityTest()
 {
-	char FileDir[] = "/home/emotion/yuyu/INRIA_documents/Accel_Brake_Param/";
+	char FileDir[] = "/home/emotion/yuyu/INRIA_documents/Accel_Brake_Para/";
 	MaxSpeed = MAX_SPEED_FOR_TEST;
 	float EPS = 5.0;
-	float min_speed = 1.0;
+	float min_speed = 0.5;
 	float speed = sqrt(car->_speed_x*car->_speed_x + car->_speed_y*car->_speed_y);
 	char FileName[255];
 
-	if (accelStart)
+	//car->ctrl.accelCmd = 0.2;
+	//car->ctrl.brakeCmd = 0.0; 
+	//FILE* fp = fopen("timeCheck.txt","a");
+	//fprintf(fp,"%f\t%f\t%f\n", GetTimeFloat(), speed, car->_distFromStartLine);
+	//fclose(fp);
+	
+	/*
+	if ( abs(speed - MaxSpeed) < 1.0)
 	{
-		car->ctrl.accelCmd = step*1.0/MAX_STEPS_FOR_VELOCITY;
+		brakeAccelStart = true;
+	}
+	if (brakeAccelStart == true)
+	{
+		car->ctrl.gear = 2;
+		car->ctrl.accelCmd = 0.2;
 		car->ctrl.brakeCmd = 0.0;
-		fprintf(logFile, "%f\t%f\n", speed, car->ctrl.accelCmd);		
+	}
+	*/
+
+	
+	if (accelStart)	// accel from v=0
+	{
+		car->ctrl.accelCmd = accelStep*1.0/MAX_STEPS_FOR_ACCEL;
+		car->ctrl.brakeCmd = 0.0;
+		if (logFile!=NULL)
+			fprintf(logFile, "%f\t%f\n", speed, car->ctrl.accelCmd);		
 		if ( speed >= MAX_SPEED_FOR_TEST || abs(car->_distFromStartLine - ACCEL_STOP_POINT) < EPS )
 		{
 			accelStart = false;
-			fclose(logFile);
+			SafeFclose(logFile);
 		}
 		return;
-	}else if (brakeStart)
+	}else if (brakeStart) // brake
 	{
 		car->ctrl.accelCmd = 0.0;
-		car->ctrl.brakeCmd = step*1.0/MAX_STEPS_FOR_VELOCITY;
-		fprintf(logFile, "%f\t%f\n", speed, -car->ctrl.brakeCmd);
+		car->ctrl.brakeCmd = brakeStep*1.0/MAX_STEPS_FOR_BRAKE;
+		if (logFile!=NULL)
+			fprintf(logFile, "%f\t%f\n", speed, -car->ctrl.brakeCmd);
 		if ( speed <= min_speed || abs(car->_distFromStartLine - BRAKE_STOP_POINT) < EPS )
 		{
 			brakeStart = false;
-			fclose(logFile);
+			SafeFclose(logFile);
 		}
 		return;
-	}else if (brakeBeforeAccel)
+	}else if (brakeAccelStart) // brake by accel from max_speed
+	{
+		car->ctrl.accelCmd = (brakeAccelStep-1)*1.0/MAX_STEPS_FOR_ACCEL;
+		car->ctrl.brakeCmd = 0.0;
+		if (logFile!=NULL)
+			fprintf(logFile, "%f\t%f\n", speed, car->ctrl.accelCmd);		
+		if ( speed <= min_speed || abs(car->_distFromStartLine - BRAKE_STOP_POINT) < EPS )
+		{
+			brakeAccelStart = false;
+			SafeFclose(logFile);
+		}
+		return;
+	}else if (brakeBeforeAccel) // brake to v=0
 	{
 		car->ctrl.accelCmd = 0.0;
 		car->ctrl.brakeCmd = 1.0;
 		if ( speed <= min_speed)
 		{
-			step++;
-			//step = 5;	//for test
-			step = (step-1)%MAX_STEPS_FOR_VELOCITY + 1;					
-			for (int i=1; i<=10000; i++)
+			accelStep++;
+			accelStep = (accelStep-1)%MAX_STEPS_FOR_ACCEL + 1;	
+			if (accelStep==1)
 			{
-				sprintf(FileName,"%s%s_accel_%02d0(%02d).txt", FileDir, car->_carName, step, i);
-				if (logFile = fopen(FileName,"r"))
-				{
-					fclose(logFile);
-				}else
-					break;
-			}
+				brakeStep = 0;
+				roundTestVelocity++;
+				brakeAccelStep = 0;
+			}				
+			sprintf(FileName,"%s%s_accel_%02d0(%02d).txt", FileDir, car->_carName, accelStep, roundTestVelocity);
 			logFile = fopen(FileName,"w");
 			brakeBeforeAccel = false;
 			accelStart = true;
@@ -943,20 +990,32 @@ void Driver::VelocityTest()
 	{
 		if ( abs(car->_distFromStartLine - ACCEL_START_POINT) < EPS )
 		{
-			brakeBeforeAccel = true;
+			if (accelStep == brakeAccelStep + 1 && brakeAccelStep < MAX_STEPS_FOR_BA)
+			{
+				brakeAccelStep++;
+				brakeAccelStep = (brakeAccelStep-1)%MAX_STEPS_FOR_BA + 1;
+				sprintf(FileName,"%s%s_brakeAccel_%02d0(%02d).txt", FileDir, car->_carName, brakeAccelStep-1, roundTestVelocity);
+				logFile = fopen(FileName,"w");
+				brakeAccelStart = true;
+			}
+			else
+			{
+				brakeBeforeAccel = true;
+			}
 		}else if ( abs(car->_distFromStartLine - BRAKE_START_POINT) < EPS )
 		{
-			for (int i=1; i<=10000; i++)
-			{
-				sprintf(FileName,"%s%s_brake_%02d0(%02d).txt",FileDir, car->_carName, step, i);
-				if (logFile = fopen(FileName,"r"))
-				{
-					fclose(logFile);
-				}else
-					break;
-			}
+			brakeStep++;
+			brakeStep = (brakeStep-1)%MAX_STEPS_FOR_BRAKE + 1;
+			sprintf(FileName,"%s%s_brake_%02d0(%02d).txt",FileDir, car->_carName, brakeStep, roundTestVelocity);
 			logFile = fopen(FileName,"w");
 			brakeStart = true;
 		}
 	}
+}
+
+bool Driver::SafeFclose(FILE* fp)
+{
+	if (fp!=NULL)
+		fclose(fp);
+	return true;
 }

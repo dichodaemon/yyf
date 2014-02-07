@@ -29,7 +29,7 @@
 #include <raceman.h>
 #include <robottools.h>
 #include <robot.h>
-
+#include <time.h>
 #include "linalg.h"
 #include "opponent.h"
 
@@ -145,15 +145,24 @@ class Driver {
 		static const float ACCEL_STOP_POINT;
 		static const float BRAKE_START_POINT;
 		static const float BRAKE_STOP_POINT;
-		static const int MAX_STEPS_FOR_VELOCITY;
+		static const int MAX_STEPS_FOR_ACCEL;
+		static const int MAX_STEPS_FOR_BRAKE;
+		static const int MAX_STEPS_FOR_BA;
 		static const float MAX_SPEED_FOR_TEST;
-		int step;
+		static const float BRAKE_ACCEL_START_POINT;
+		static const float BRAKE_ACCEL_STOP_POINT;
+		int accelStep;
+		int brakeStep;
+		int brakeAccelStep;
+		int roundTestVelocity;
 		bool brakeBeforeAccel;		
 		bool accelStart;
 		bool brakeStart;
+		bool brakeAccelStart;
 		FILE* logFile;
 		void VelocityTest();
-
+		float GetTimeFloat();
+		bool SafeFclose(FILE* fp);
 
 		/* track variables */
 		tTrack* track;
