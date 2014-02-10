@@ -19,8 +19,8 @@
 
 /* class variables and constants */
 tTrack* Opponent::track;
-float Opponent::FRONTCOLLDIST = 200.0;	/* [m] distance to check for other cars */
-float Opponent::BACKCOLLDIST = 50.0;	/* [m] distance to check for other cars */
+float Opponent::FRONTCOLLDIST = 100.0;	/* [m] distance to check for other cars */
+float Opponent::BACKCOLLDIST = 100.0;	/* [m] distance to check for other cars */
 float Opponent::LENGTH_MARGIN = 2.0;	/* [m] safety margin */
 float Opponent::SIDE_MARGIN = 1.0;		/* [m] safety margin */
 float Opponent::MIN_SPEED_DIF = 2.0;	/* [m/s] front car's speed is higher than "my speed + it" */
@@ -103,13 +103,14 @@ void Opponent::update(tSituation *s, Driver *driver)
 			if (cardist < SIDE_MARGIN)
 				state |= OPP_COLL;
 		} else
-		/* is opponent behind and faster */
+		/* is opponent in front and slower in Inverse Driving*/
 		if (distance < -SIDECOLLDIST && fabs(speed) < fabs(driver->getSpeed()) + MIN_SPEED_DIF)
 		{
-			catchdist = driver->getSpeed()*distance/(speed - driver->getSpeed());
+			distance = -distance;
+			catchdist = driver->getSpeed()*distance/(driver->getSpeed() - speed);
 			state |= OPP_BACK;
-			distance += MAX(car->_dimension_x, mycar->_dimension_x);
-			distance += LENGTH_MARGIN;
+			distance -= MAX(car->_dimension_x, mycar->_dimension_x);
+			distance -= LENGTH_MARGIN;
 			float cardist = car->_trkPos.toMiddle - mycar->_trkPos.toMiddle;
 			sidedist = cardist;
 			cardist = fabs(cardist) - fabs(width/2.0) - mycar->_dimension_y/2.0;

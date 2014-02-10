@@ -31,7 +31,7 @@ const float Driver::FULL_ACCEL_MARGIN = 1.0;				/* [m/s] */
 const float Driver::SHIFT = 0.9;							/* [-] (% of rpmredline) */
 const float Driver::SHIFT_MARGIN = 4.0;						/* [m/s] */
 const float Driver::ABS_SLIP = 0.9;							/* [-] range [0.95..0.3] */
-const float Driver::ABS_MINSPEED = 3.0;						/* [m/s] */
+const float Driver::ABS_MINSPEED = 5.0;						/* [m/s] */
 const float Driver::TCL_SLIP = 0.9;							/* [-] range [0.95..0.3] */
 const float Driver::TCL_MINSPEED = 3.0;						/* [m/s] */
 const float Driver::LOOKAHEAD_CONST = 5.0;					/* [m] */
@@ -39,17 +39,17 @@ const float Driver::LOOKAHEAD_FACTOR = 0.33;				/* [-] */
 const float Driver::WIDTHDIV = 3.0;							/* [-] */
 const float Driver::SIDECOLL_MARGIN = 2.0;					/* [m] */
 const float Driver::BORDER_OVERTAKE_MARGIN = 0.5;			/* [m] */
-const float Driver::OVERTAKE_OFFSET_INC = 0.1;				/* [m/timestep] */
+const float Driver::OVERTAKE_OFFSET_INC = 0.05;				/* [m/timestep] */
 const float Driver::MIN_DIST_FOR_SPEED_LIMIT = 80.0;		/* [m] */
 const int   Driver::TIME_FOR_VEL_CHANGE = 1000;
 const int 	Driver::ZIG_ZAG_TIME = 6;
 
 // yyf Test for Kalman filter 20140204
+const int Driver::INDEX_FOR_CHANGE = -1;
 const int Driver::MAX_COUNT_FOR_CHANGE = 200;
-const int Driver::INDEX_FOR_CHANGE = 0;
 
 // yyf Test for velocity
-const int Driver::INDEX_FOR_VELOCITY = 1;
+const int Driver::INDEX_FOR_VELOCITY = -1;
 const int Driver::MAX_STEPS_FOR_ACCEL = 10;
 const int Driver::MAX_STEPS_FOR_BRAKE = 10;
 const int Driver::MAX_STEPS_FOR_BA = 3;
@@ -61,22 +61,12 @@ const float Driver::BRAKE_ACCEL_START_POINT = 715;
 const float Driver::BRAKE_ACCEL_STOP_POINT = 1300;
 const float Driver::MAX_SPEED_FOR_TEST = 33.4;
 
+// yyf Test for overtaking
+const int Driver::INDEX_FOR_OVERTAKING = 5;
+const int Driver::WAIT_FRAME_FOR_OVERTAKING = 3000;
+const float Driver::MIN_DIST_FOR_OVERTAKING = 20;
+const float Driver::MIN_SPEED_FOR_OVERTAKING = 30.0;
 
-/*
-Driver::Driver(int index)
-{
-	INDEX = index;
-	MaxSpeed = FLT_MAX;
-	InverseDriving = false;
-}
-
-Driver::Driver(int index, float max_speed)
-{
-	INDEX = index;
-	MaxSpeed = max_speed;
-	InverseDriving = false;
-}
-*/
 Driver::Driver(int index, float max_speed, bool inverse_driving, int initial_pose, int leading_car)
 {
 	INDEX = index;
@@ -101,7 +91,6 @@ void Driver::initTrack(tTrack* t, void *carHandle, void **carParmHandle, tSituat
 {
 	track = t;
 	*carParmHandle = NULL;
-
 }
 
 
@@ -132,6 +121,9 @@ void Driver::newRace(tCarElt* car, tSituation *s)
 	brakeStep = 0;
 	brakeAccelStep = 0;
 	roundTestVelocity = 0;
+
+	// yyf Test for overtaking
+	wait_frame_now = 0;
 }
 
 
@@ -192,17 +184,6 @@ bool Driver::inverseYaw()
 /* Drive during race. */
 void Driver::drive(tSituation *s)
 {
-
-	/*
-	// change the expected speed every TIME_FOR_VEL_CHANGE frames
-	if (vel_keep_time++ >= TIME_FOR_VEL_CHANGE)
-	{
-		vel_keep_time = 0;
-		MaxSpeed = rand()%30+100.0;
-		//printf("index %d: %.2f\t", INDEX, MaxSpeed);
-	}
-	*/
-
 	update(s);
 	memset(&car->ctrl, 0, sizeof(tCarCtrl));
 
@@ -218,8 +199,7 @@ void Driver::drive(tSituation *s)
 		car->ctrl.accelCmd = 0.5; // 30% accelerator pedal
 		car->ctrl.brakeCmd = 0.0; // no brakes
 	} else {
-			car->ctrl.steer = filterSColl(getSteer());
-
+		car->ctrl.steer = filterSColl(getSteer());
 		car->ctrl.gear = getGear();
 		
 		if (InitialPose>=0 && !PoseInitialized && fabs( InitialPose - car->_distFromStartLine)<20 )
@@ -242,6 +222,20 @@ void Driver::drive(tSituation *s)
 	if (INDEX==INDEX_FOR_VELOCITY)
 		VelocityTest();
 
+	// yyf Test for overtaking
+	// wait until the scenario is done
+	if (INDEX==INDEX_FOR_OVERTAKING)
+	{
+		wait_frame_now++;
+		if (wait_frame_now<WAIT_FRAME_FOR_OVERTAKING)
+		{
+			car->ctrl.accelCmd = 0.0;
+			car->ctrl.brakeCmd = 1.0;
+			car->ctrl.gear = 0;
+		}else
+			SendMessages(INDEX, car, s);
+		// printf("%d\n",wait_frame_now);
+	}
 }
 
 
@@ -275,105 +269,15 @@ float Driver::getAllowedSpeed(tTrackSeg *segment)
 	tTrackSeg *s = segment;
 	tTrackSeg *sOrigin = s;
 
-
-	// calculate the speed limit by the max limit
-	/*
-	if (!InverseDriving)
-	{
-		length = getDistToSegEnd();
-		s = s->next;
-	}else
-	{
-		length = getDistToSegStart();
-		s = s->prev;
-	}
-
-	float tmp_length = 0;
-
-	while (length < MIN_DIST_FOR_SPEED_LIMIT)
-	{
-		if (s->type != TR_STR)
-		{
-			arc = s->arc/PI*2.0;
-			mu = sOrigin->surface->kFriction;
-			//r = (sOrigin->radius + sOrigin->width/2.0)/sqrt(arc);
-			r = s->radius;
-			//speed_limit = MIN( speed_limit, sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass))));
-			
-			if ( speed_limit - 1> sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass))) )
-			{
-				speed_limit = sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass)));
-				tmp_length = length;
-			}
-		}
-
-		length += s->length;
-		if (!InverseDriving)
-			s = s->next;
-		else
-			s = s->prev;
-	}
-
-	//if (INDEX==4 && tmp_length>1)
-	//	printf("speed_limit: %f\t at length %f\n",speed_limit,tmp_length);
-	//printf("speed_limit: %f\n",speed_limit);
-	
-	
-	if (INDEX==4 && speed_limit < 23)
-	{
-		printf("length: %f+++++++++++++++++++\n",segment->length);
-		speed_limit = MaxSpeed;
-		s = segment;
-		if (!InverseDriving)
-		{
-			length = getDistToSegEnd();
-			s = s->next;
-		}else
-		{
-			length = getDistToSegStart();
-			s = s->prev;
-		}
-		while (length < MIN_DIST_FOR_SPEED_LIMIT)
-		{
-			printf("length: %.4f\t",length);
-			if (s->type != TR_STR)
-			{
-				arc = s->arc/PI*2.0;
-				mu = sOrigin->surface->kFriction;
-				//r = (sOrigin->radius + sOrigin->width/2.0)/sqrt(arc);
-				r = s->radius;
-				//speed_limit = MIN( speed_limit, sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass))));
-			
-				if ( speed_limit - 1> sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass))) )
-				{
-					speed_limit = sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass)));
-					tmp_length = length;
-				}
-				printf("speed:%.4f\t at %.4f\t with r=%.4lf\t, mu=%.4lf, arc=%.4lf, argsign= %d\n",
-						sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass))), length, r, mu, s->arc, (s->type == TR_RGT) ? -1 : 1);
-				
-			}
-
-			length += s->length;
-			if (!InverseDriving)
-				s = s->next;
-			else
-				s = s->prev;
-		}
-		printf("\n---------------------------------\n");
-	}
-	return speed_limit;
-	*/
-
 	s = segment;
 	if (s->type == TR_STR)
 	{
-		//printf("straight");
 		return MaxSpeed;
     }
 	sOrigin = s;
 	arc = 0;
-	while (s->type == sOrigin->type && arc < PI/2.0) {
+	while (s->type == sOrigin->type && arc < PI/2.0)
+	{
 		arc += s->arc;
 		if (!InverseDriving)
 			s = s->next;
@@ -385,27 +289,19 @@ float Driver::getAllowedSpeed(tTrackSeg *segment)
 
 	r = sOrigin->radius;
 	if ( (sOrigin->type == TR_RGT && InverseDriving) || (sOrigin->type != TR_RGT && !InverseDriving) )
-		r -= sOrigin->width/4;
-	else
 		r += sOrigin->width/4;
-	float w = sOrigin->width/4;
-
+	else
+		r -= sOrigin->width/4;
 	
-
+	/* // for higher speed limit
+	float w = sOrigin->width/4;
 	if ( r*(1-cos(arc))<= w )
 	{
-		//printf("ignore\n");
 		return MaxSpeed;
 	}
 	r = r + w*(2*r+w) / (2*(r*(1-cos(arc))-w));
-
-	// r = (sOrigin->radius + sOrigin->width/2.0)/sqrt(arc);
-
-	//if (INDEX==4)
-	//	printf("radius: %f\t R: %f\tspeed1: %f\n",sOrigin->radius, r, sqrt((mu*G*r)/(1.0 - MIN(0.99, r*CA*mu/mass))));
+	*/
 	return MIN( MaxSpeed, sqrt((mu*G*r)/(1.0 - MIN(1.0, r*CA*mu/mass))));
-
-
 }
 
 
@@ -463,9 +359,6 @@ float Driver::getBrake()
 		return 1.0;
 	}
 
-	//if (INDEX==4)
-	//	printf("\nINDEX:%d\t length: %f\t max: %f  ******************\n",INDEX, segptr->length, maxlookaheaddist);
-	
 	// Pose Initializing
 	if (InitialPose>=0 && !PoseInitialized)
 	{
@@ -479,30 +372,26 @@ float Driver::getBrake()
 		allowedspeed = 0;
 		float allowedspeedsqr = allowedspeed*allowedspeed;
 		brakedist = mass*(currentspeedsqr - allowedspeedsqr) / (2.0*(mu*G*mass + allowedspeedsqr*(CA*mu + CW)));
-		if (brakedist > lookaheaddist * 2) {
-			//if (INDEX==4)				
-			//printf("\nlook: %lf,\t brake: %f,\t max: %f\n",lookaheaddist, brakedist, maxlookaheaddist);
+		if (brakedist * 1.2 > lookaheaddist) {
 			return 1.0;
-		}else if (brakedist > lookaheaddist*1.2)
+		}else if (brakedist * 1.4 > lookaheaddist)
 			return 0.5;
-		else if (brakedist > lookaheaddist*1.5)
+		else if (brakedist *1.6 > lookaheaddist)
 			return 0.2;
 	}
 
+	// normal brake control
 	lookaheaddist = 0;
-	//segptr = segptr->next;
 	while (lookaheaddist < maxlookaheaddist) {
 		allowedspeed = getAllowedSpeed(segptr);
 		if (allowedspeed < car->_speed_x) {
 			allowedspeedsqr = allowedspeed*allowedspeed;
 			brakedist = mass*(currentspeedsqr - allowedspeedsqr) / (2.0*(mu*G*mass + allowedspeedsqr*(CA*mu + CW)));
-			if (brakedist > lookaheaddist) {
-				//if (INDEX==4)				
-				//printf("\nlook: %lf,\t brake: %f,\t max: %f\n",lookaheaddist, brakedist, maxlookaheaddist);
+			if (brakedist * 1.2 > lookaheaddist) {
 				return 1.0;
-			}else if (brakedist > lookaheaddist*1.2)
+			}else if (brakedist * 1.4 > lookaheaddist)
 				return 0.5;
-			else if (brakedist > lookaheaddist*1.5)
+			else if (brakedist * 1.6 > lookaheaddist)
 				return 0.2;
 		}
 		lookaheaddist += segptr->length;
@@ -556,7 +445,6 @@ v2d Driver::getTargetPoint()
 {
 	tTrackSeg *seg = car->_trkPos.seg;
 	float lookahead, length, offset;
-	//float offset = getOvertakeOffset();
 
 	lookahead = LOOKAHEAD_CONST + car->_speed_x*LOOKAHEAD_FACTOR;
 
@@ -579,6 +467,15 @@ v2d Driver::getTargetPoint()
 		}
 		length = length - lookahead;
 		offset = seg->width/4;
+	}
+
+	// yyf Test for overtaking
+	if (INDEX == INDEX_FOR_OVERTAKING)
+	{
+		if (!InverseDriving)
+			offset += getOvertakeOffset();
+		else
+			offset -= getOvertakeOffset();
 	}
 
 	// yyf Test for Kalman filter
@@ -624,29 +521,81 @@ v2d Driver::getTargetPoint()
 float Driver::getOvertakeOffset()
 {
 	int i;
-	float catchdist, mincatchdist = FLT_MAX;
+	float catchdist;
+	float mincatchdist = FLT_MAX;
+	float mindist = FLT_MAX;
 	Opponent *o = NULL;
+	
+	// the segments allowed overtaking
+	bool overtakeAllowed = true;
+	float overtakeDistance = 100;
 
-	for (i = 0; i < opponents->getNOpponents(); i++) {
-		if (opponent[i].getState() & OPP_FRONT) {
+	tTrackSeg *segptr = car->_trkPos.seg;
+	float lookaheaddist = 0;
+	while (lookaheaddist < overtakeDistance)
+	{
+		if (getAllowedSpeed(segptr) < MIN_SPEED_FOR_OVERTAKING)
+		{
+			overtakeAllowed = false;
+			break;
+		}
+		lookaheaddist += segptr->length;
+		if (!InverseDriving)
+			segptr = segptr->next;
+		else
+			segptr = segptr->prev;
+
+	}
+
+	for (i = 0; i < opponents->getNOpponents(); i++)
+	{
+		if ( (!InverseDriving && (opponent[i].getState() & OPP_FRONT))
+			||(InverseDriving && (opponent[i].getState() & OPP_BACK)) )
+		{
 			catchdist = opponent[i].getCatchDist();
-			if (catchdist < mincatchdist) {
+			if (catchdist < mincatchdist && opponent[i].getDistance() < mindist)
+			{
 				mincatchdist = catchdist;
+				mindist = opponent[i].getDistance();
 				o = &opponent[i];
 			}
 		}
 	}
 
-	if (o != NULL) {
-		float w = o->getCarPtr()->_trkPos.seg->width/WIDTHDIV-BORDER_OVERTAKE_MARGIN;
+
+
+	/*
+	if (o != NULL && mindist<=MIN_DIST_FOR_OVERTAKING)
+	{
+		float w = o->getCarPtr()->_trkPos.seg->width/WIDTHDIV - BORDER_OVERTAKE_MARGIN;
 		float otm = o->getCarPtr()->_trkPos.toMiddle;
 		if (otm > 0.0 && myoffset > -w) myoffset -= OVERTAKE_OFFSET_INC;
 		else if (otm < 0.0 && myoffset < w) myoffset += OVERTAKE_OFFSET_INC;
-	} else {
+	}else
+	{
 		if (myoffset > OVERTAKE_OFFSET_INC) myoffset -= OVERTAKE_OFFSET_INC;
 		else if (myoffset < -OVERTAKE_OFFSET_INC) myoffset += OVERTAKE_OFFSET_INC;
 		else myoffset = 0.0;
+	}*/
+
+	if (overtakeAllowed && o != NULL && mindist<=MIN_DIST_FOR_OVERTAKING)
+	{
+		//printf("%f\n",myoffset);
+		float w = o->getCarPtr()->_trkPos.seg->width/WIDTHDIV;
+		if (myoffset < w)
+			myoffset += OVERTAKE_OFFSET_INC;
+		else
+			myoffset -= OVERTAKE_OFFSET_INC;			
+	}else
+	{
+		if (myoffset > OVERTAKE_OFFSET_INC)
+			myoffset -= OVERTAKE_OFFSET_INC;
+		else if (myoffset < -OVERTAKE_OFFSET_INC)
+				myoffset += OVERTAKE_OFFSET_INC;
+			else
+				myoffset = 0.0;
 	}
+
 	return myoffset;
 }
 
@@ -734,12 +683,13 @@ float Driver::filterBColl(float brake)
 				brakedist += MIN_TIME_FOR_BRAKE_START * car->_speed_x;
 				if (brakedist + MIN_DIST_BETWEEN_CARS > fabs(opponent[i].getDistance()))
 				{
-					return -1.0;
+					return 1.0;
 				}
 			}
 		}else
 		{
 			//printf("\nindex: %d\t",INDEX);
+			//if (INDEX==6 && i==6)	printf("%f\n",opponent[i].getDistance());
 			if ( (opponent[i].getState() & OPP_COLL) && (opponent[i].getState() & OPP_BACK))
 			{
 				//printf("COLL\t");
@@ -750,7 +700,7 @@ float Driver::filterBColl(float brake)
 				//printf("allow: %f\tself %f\tdist%f",allowedspeedsqr, car->_speed_x, brakedist);
 				if (brakedist + MIN_DIST_BETWEEN_CARS > fabs(opponent[i].getDistance()))
 				{
-					return -1.0;
+					return 1.0;
 				}
 			}			
 		}
@@ -813,7 +763,7 @@ float Driver::filterABS(float brake)
 	}
 	slip = slip/4.0;
 	if (slip < ABS_SLIP) brake = brake*slip;
-	return brake/2;
+	return brake;
 }
 
 

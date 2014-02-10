@@ -16,7 +16,7 @@
 ROBOT       = yyf
 MODULE      = ${ROBOT}.so
 MODULEDIR   = drivers/${ROBOT}
-SOURCES     = ${ROBOT}.cpp driver.cpp opponent.cpp
+SOURCES     = ${ROBOT}.cpp driver.cpp opponent.cpp facade.cpp semaphore.cpp DataCollection.cpp
 
 SHIPDIR     = drivers/${ROBOT}
 SHIP        = ${ROBOT}.xml kc-p4.rgb logo.rgb

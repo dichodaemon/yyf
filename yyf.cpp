@@ -78,8 +78,10 @@ static int InitFuncPt(int index, void *pt)
     tRobotItf *itf  = (tRobotItf *)pt; 
 
     /* create robot instance for index */
-    driver[index] = new Driver(index, 20, (index>=leadingCarLabel) ? true:false);//,
-								//carInitialPoses[index], (index>=leadingCarLabel) ? leadingCarLabel : leadingCarLabel-1);
+	if (index != leadingCarLabel)
+    	driver[index] = new Driver(index, 20, (index>=leadingCarLabel) ? true:false, carInitialPoses[index], (index>=leadingCarLabel) ? leadingCarLabel : leadingCarLabel-1);
+	else
+		driver[index] = new Driver(index, 40, false);
 
     itf->rbNewTrack = initTrack; /* Give the robot the track view called */ 
     itf->rbNewRace  = newRace; 	 /* Start a new race */

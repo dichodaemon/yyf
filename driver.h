@@ -33,6 +33,8 @@
 #include "linalg.h"
 #include "opponent.h"
 
+#include "DataCollection.h"
+
 class Opponents;
 class Opponent;
 
@@ -163,6 +165,13 @@ class Driver {
 		void VelocityTest();
 		float GetTimeFloat();
 		bool SafeFclose(FILE* fp);
+
+		// yyf Test for overtaking
+		static const int INDEX_FOR_OVERTAKING;
+		static const int WAIT_FRAME_FOR_OVERTAKING;
+		static const float MIN_DIST_FOR_OVERTAKING;
+		static const float MIN_SPEED_FOR_OVERTAKING;
+		int wait_frame_now;
 
 		/* track variables */
 		tTrack* track;
