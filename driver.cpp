@@ -62,8 +62,9 @@ const float Driver::BRAKE_ACCEL_STOP_POINT = 1300;
 const float Driver::MAX_SPEED_FOR_TEST = 33.4;
 
 // yyf Test for overtaking
-const int Driver::INDEX_FOR_OVERTAKING = 5;
-const int Driver::WAIT_FRAME_FOR_OVERTAKING = 3000;
+const int Driver::INDEX_FOR_OVERTAKING = 5;	// for [5 right 1 host 4 inverse]
+//const int Driver::INDEX_FOR_OVERTAKING = 9;	// for [9 right 1 host]
+const int Driver::WAIT_FRAME_FOR_OVERTAKING = 4000;
 const float Driver::MIN_DIST_FOR_OVERTAKING = 20;
 const float Driver::MIN_SPEED_FOR_OVERTAKING = 30.0;
 

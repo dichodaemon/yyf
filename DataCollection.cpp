@@ -233,7 +233,7 @@ float computeCurvature( tTrackSeg * segment )
 bool SendMessages(int index, tCarElt* car, tSituation *s)
 {
 
-	printf("Dist to start: %f\n", car->_distFromStartLine);
+	//printf("Dist to start: %f\n", car->_distFromStartLine);
 	// command
 	Command command;
 	command.steering = car->ctrl.steer;
