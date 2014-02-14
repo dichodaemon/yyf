@@ -42,12 +42,8 @@ static char carNames[CarNum][BuffSize] = {	"yyf_1","yyf_2","yyf_3","yyf_4","yyf_
 static float carInitialPoses[CarNum] = {155*5, 155*4, 155*3, 155*2, 155*1, 155*10, 155*9, 155*8, 155*7, 155*6};
 static int leadingCarLabel = 5;
 
-// for E-track 5 (Oval Tracks) [9 right 1 host] (host vehicle should be in the last position)
-//static float carInitialPoses[CarNum] = {155*9, 155*8, 155*7, 155*6, 155*5, 155*4, 155*3, 155*2, 155*1, 155*0};
-//static int leadingCarLabel = 9;
-
 // for Aalborg (Road Tracks)
-//static float carInitialPoses[carNum] = {155}
+//static float carInitialPoses[carNum] = {155*5, 155*4, 155*3, 155*2, 155*1, 155*10, 155*9, 155*8, 155*7, 155*6};
 static Driver *driver[CarNum];
 
 static void initTrack(int index, tTrack* track, void *carHandle, void **carParmHandle, tSituation *s); 

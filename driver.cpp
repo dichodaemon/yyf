@@ -44,11 +44,11 @@ const float Driver::MIN_DIST_FOR_SPEED_LIMIT = 80.0;		/* [m] */
 const int   Driver::TIME_FOR_VEL_CHANGE = 1000;
 const int 	Driver::ZIG_ZAG_TIME = 6;
 
-// yyf Test for Kalman filter 20140204
+// yyf Test for Kalman filter 20140204 [the car will drive like a snake]
 const int Driver::INDEX_FOR_CHANGE = -1;
 const int Driver::MAX_COUNT_FOR_CHANGE = 200;
 
-// yyf Test for velocity
+// yyf Test for velocity [for accel, brake, slow_down_with_accel data]
 const int Driver::INDEX_FOR_VELOCITY = -1;
 const int Driver::MAX_STEPS_FOR_ACCEL = 10;
 const int Driver::MAX_STEPS_FOR_BRAKE = 10;
@@ -61,13 +61,15 @@ const float Driver::BRAKE_ACCEL_START_POINT = 715;
 const float Driver::BRAKE_ACCEL_STOP_POINT = 1300;
 const float Driver::MAX_SPEED_FOR_TEST = 33.4;
 
-// yyf Test for overtaking
+// yyf Test for overtaking [the overtaking car (host vehicle like human_ros)]
 const int Driver::INDEX_FOR_OVERTAKING = 5;	// for [5 right 1 host 4 inverse]
-//const int Driver::INDEX_FOR_OVERTAKING = 9;	// for [9 right 1 host]
 const int Driver::WAIT_FRAME_FOR_OVERTAKING = 4000;
 const float Driver::MIN_DIST_FOR_OVERTAKING = 20;
 const float Driver::MIN_SPEED_FOR_OVERTAKING = 30.0;
 
+
+// initial_pose  is for senario generation, every car will go to the initial pose and stop
+// when "index == leading_car" drive, the environmental car drive
 Driver::Driver(int index, float max_speed, bool inverse_driving, int initial_pose, int leading_car)
 {
 	INDEX = index;
